@@ -21,8 +21,7 @@ run_all(){
 	echo "====== Begin building TU V$BUILD_VERSION! ======"
 	check_deps
 	prepare_workdir
-	build_lib_for_android main-flushall tu8_kgsl.patch
-	build_lib_for_android main-noflushall 0001-HACK-tu-disable-force-enabled-flushall.patch
+	build_lib_for_android main tu8_kgsl.patch
 }
 
 check_deps(){
@@ -67,7 +66,7 @@ build_lib_for_android(){
 	echo "==== Building Mesa on $1 branch ===="
 	#git reset --hard
 	echo "Applying patches... ($2)"
-    	wget https://github.com/whitebelyash/mesa-tu8/releases/download/patchset-head/$2
+    	wget https://github.com/whitebelyash/mesa-tu8/releases/download/patchset-head-v2/$2
 		if ! git apply --check $2; then
 			echo "Failed to apply $2!"
 			exit 1
