@@ -10,8 +10,8 @@ magiskdir="$workdir/turnip_module"
 ndkver="android-ndk-r29"
 ndk="$workdir/$ndkver/toolchains/llvm/prebuilt/linux-x86_64/bin"
 sdkver="34"
-mesasrc="https://gitlab.freedesktop.org/mesa/mesa/-/archive/mesa-25.3.0/mesa-mesa-25.3.0.zip"
-srcfolder="mesa-25.3.0"
+mesasrc="https://gitlab.freedesktop.org/mesa/mesa/-/archive/mesa-26.0.2/mesa-mesa-26.0.2.zip"
+srcfolder="mesa-26.0.2"
 
 clear
 
