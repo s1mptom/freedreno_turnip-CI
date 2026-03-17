@@ -12,6 +12,7 @@ ndkver="android-ndk-r29"
 ndk="$workdir/$ndkver/toolchains/llvm/prebuilt/linux-x86_64/bin"
 sdkver="34"
 mesasrc="https://gitlab.freedesktop.org/mesa/mesa"
+mesacommit="9e277ed2b6d"
 srcfolder="mesa"
 
 clear
@@ -55,9 +56,11 @@ prepare_workdir(){
 	echo "Exracting android-ndk ..." $'\n'
 		unzip "$ndkver"-linux.zip &> /dev/null
 
-	echo "Downloading mesa source ..." $'\n'
-		git clone $mesasrc --depth=1 -b main $srcfolder
+	echo "Downloading mesa source (commit $mesacommit) ..." $'\n'
+		git init $srcfolder
 		cd $srcfolder
+		git fetch --depth=1 $mesasrc $mesacommit
+		git checkout FETCH_HEAD
 #	echo "Pushing TU_VERSION..."
 #		echo "#define TUGEN8_DRV_VERSION \"v$BUILD_VERSION\"" > ./src/freedreno/vulkan/tu_version.h
 }
