@@ -43,5 +43,4 @@ jobs:
         name: Mesa Turnip v${{ inputs.version }}
         files: |
            /tmp/mesa-turnip-main-V${{ inputs.version }}.zip
-           /tmp/mesa-turnip-main-V${{ inputs.version }}.zip
 
