@@ -85,11 +85,15 @@ build_lib_for_android(){
 	#git reset --hard
 	echo "Applying patches... ($2)"
     	wget https://github.com/whitebelyash/mesa-tu8/releases/download/patchset-head-v2/$2
-		if ! git apply --check $2; then
-			echo "Failed to apply $2!"
-			exit 1
+		if ! git apply --check $2 2>/dev/null; then
+			echo "Strict apply failed, trying with fuzz..."
+			if ! patch -p1 --fuzz=3 < $2; then
+				echo "Failed to apply $2!"
+				exit 1
+			fi
+		else
+			git apply $2
 		fi
-    	git apply $2
 
 	echo "Applying timeline sync Android fix..."
 	apply_timeline_sync_fix
