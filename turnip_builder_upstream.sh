@@ -5,13 +5,17 @@ green='\033[0;32m'
 red='\033[0;31m'
 nocolor='\033[0m'
 deps="git meson ninja patchelf unzip curl pip flex bison zip glslang glslangValidator"
+scriptdir="$(cd "$(dirname "$0")" && pwd)"
 workdir="$(pwd)/turnip_workdir"
 magiskdir="$workdir/turnip_module"
 ndkver="android-ndk-r29"
 ndk="$workdir/$ndkver/toolchains/llvm/prebuilt/linux-x86_64/bin"
 sdkver="34"
-mesasrc="https://gitlab.freedesktop.org/mesa/mesa"
+mesasrc="https://gitlab.freedesktop.org/mesa/mesa.git"
 srcfolder="mesa"
+
+# Optional: pin to a specific commit (set via env or leave empty for latest)
+MESA_COMMIT="${MESA_COMMIT:-}"
 
 clear
 
@@ -54,24 +58,79 @@ prepare_workdir(){
 	echo "Exracting android-ndk ..." $'\n'
 		unzip "$ndkver"-linux.zip &> /dev/null
 
-	echo "Downloading mesa source ..." $'\n'
-		git clone $mesasrc --depth=1 -b main $srcfolder
+	if [ -n "$MESA_COMMIT" ]; then
+		echo "Downloading mesa source (commit $MESA_COMMIT) ..." $'\n'
+		curl -L "https://gitlab.freedesktop.org/mesa/mesa/-/archive/$MESA_COMMIT/mesa-$MESA_COMMIT.tar.gz" -o mesa.tar.gz
+		tar xzf mesa.tar.gz
+		mv mesa-$MESA_COMMIT* $srcfolder
 		cd $srcfolder
-#	echo "Pushing TU_VERSION..."
-#		echo "#define TUGEN8_DRV_VERSION \"v$BUILD_VERSION\"" > ./src/freedreno/vulkan/tu_version.h
+		git init && git add -A && git commit -q -m "mesa $MESA_COMMIT"
+	else
+		echo "Cloning latest mesa source (main branch) ..." $'\n'
+		git clone --depth=1 --branch main "$mesasrc" "$srcfolder"
+		cd $srcfolder
+	fi
 }
 
+
+apply_timeline_sync_fix(){
+	local kgsl_file="src/freedreno/vulkan/tu_knl_kgsl.cc"
+	if ! grep -q "vk_kgsl_timeline_type" "$kgsl_file" 2>/dev/null; then
+		echo "Timeline sync not present in patchset, skipping fix"
+		return
+	fi
+
+	python3 "$scriptdir/patches/fix_timeline_sync.py" "$kgsl_file"
+
+	if grep -q "kgsl_binary_timeline_import_sync_file" "$kgsl_file"; then
+		echo -e "${green}Timeline sync Android fix applied successfully${nocolor}"
+	else
+		echo -e "${red}Warning: Timeline sync fix failed to apply${nocolor}"
+		exit 1
+	fi
+}
+
+apply_devices_fix(){
+	local devices_file="src/freedreno/common/freedreno_devices.py"
+	if [ ! -f "$devices_file" ]; then
+		echo -e "${red}freedreno_devices.py not found!${nocolor}"
+		exit 1
+	fi
+
+	python3 "$scriptdir/patches/fix_devices.py" "$devices_file"
+
+	if grep -q "a8xx_825" "$devices_file"; then
+		echo -e "${green}Device entries fix applied successfully${nocolor}"
+	else
+		echo -e "${red}Warning: Device entries fix failed to apply${nocolor}"
+		exit 1
+	fi
+}
 
 build_lib_for_android(){
 	echo "==== Building Mesa on $1 branch ===="
 	#git reset --hard
-	echo "Applying patches... ($2)"
+	echo "Downloading patch... ($2)"
     	wget https://github.com/whitebelyash/mesa-tu8/releases/download/patchset-head-v2/$2
-		if ! git apply --check $2; then
-			echo "Failed to apply $2!"
-			exit 1
+
+	echo "Filtering freedreno_devices.py hunks from patch..."
+	python3 "$scriptdir/patches/filter_patch.py" "$2" "${2%.patch}_filtered.patch"
+
+	echo "Applying filtered patches..."
+		if ! git apply "${2%.patch}_filtered.patch"; then
+			echo "git apply failed, trying git am..."
+			git am --abort 2>/dev/null || true
+			if ! git am --3way "${2%.patch}_filtered.patch"; then
+				echo "Failed to apply ${2%.patch}_filtered.patch!"
+				exit 1
+			fi
 		fi
-    	git apply $2
+
+	echo "Applying freedreno_devices.py fixes..."
+	apply_devices_fix
+
+	echo "Applying timeline sync Android fix..."
+	apply_timeline_sync_fix
 	#git checkout origin/$1
 	#Workaround for using Clang as c compiler instead of GCC
 	mkdir -p "$workdir/bin"
